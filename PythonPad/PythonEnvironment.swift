@@ -15,22 +15,32 @@ class PythonEnvironment: ObservableObject {
     @Published var showShell: Bool = false
     @Published var installedPackages: [String] = []
     
-    private var process: Process?
-    private let pythonPath: String
-    private let pipPath: String
     private let documentsPath: String
+    private var pythonInterpreter: PythonInterpreter?
     
     init() {
         // Get documents directory
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         documentsPath = paths[0].path
         
-        // Set up Python paths (using system Python for now)
-        // In a real implementation, you would bundle Python with the app
-        pythonPath = "/usr/bin/python3"
-        pipPath = "/usr/bin/pip3"
+        // Initialize Python interpreter
+        pythonInterpreter = PythonInterpreter()
         
         loadInstalledPackages()
+        
+        // Show startup message
+        output = """
+        Welcome to PythonPad for iPadOS!
+        
+        Note: This is a demonstration app. Full Python runtime requires:
+        - Embedding Python framework in the app bundle
+        - Or using a WebAssembly Python interpreter
+        - Process API is not available on iOS/iPadOS
+        
+        For now, the app demonstrates the UI and workflow.
+        To make this fully functional, integrate Python.framework or use PythonKit.
+        
+        """
     }
     
     func runScript(_ script: String) {
@@ -40,41 +50,13 @@ class PythonEnvironment: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let process = Process()
-            let pipe = Pipe()
-            let errorPipe = Pipe()
+            // Simulate Python execution since Process API is not available on iOS
+            let result = self.pythonInterpreter?.execute(script) ?? "Error: Python interpreter not initialized"
             
-            process.executableURL = URL(fileURLWithPath: self.pythonPath)
-            process.arguments = ["-c", script]
-            process.standardOutput = pipe
-            process.standardError = errorPipe
-            process.currentDirectoryURL = URL(fileURLWithPath: self.documentsPath)
-            
-            self.process = process
-            
-            do {
-                try process.run()
-                
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                
-                process.waitUntilExit()
-                
-                DispatchQueue.main.async {
-                    if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                        self.output += output
-                    }
-                    if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
-                        self.output += "Error: \(errorOutput)"
-                    }
-                    self.output += "\n--- Exit Code: \(process.terminationStatus) ---\n"
-                    self.isRunning = false
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.output += "Failed to run: \(error.localizedDescription)\n"
-                    self.isRunning = false
-                }
+            DispatchQueue.main.async {
+                self.output += result
+                self.output += "\n--- Execution Complete ---\n"
+                self.isRunning = false
             }
         }
     }
@@ -88,79 +70,116 @@ class PythonEnvironment: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let process = Process()
-            let pipe = Pipe()
-            let errorPipe = Pipe()
+            // Simulate package installation
+            let simulatedOutput = """
+            Collecting \(packageName)
+            Note: Process API is not available on iOS/iPadOS.
+            To enable package installation, integrate pip with embedded Python framework.
             
-            process.executableURL = URL(fileURLWithPath: self.pipPath)
-            process.arguments = ["install", packageName, "--user"]
-            process.standardOutput = pipe
-            process.standardError = errorPipe
+            Package '\(packageName)' has been added to the simulated package list.
+            """
             
-            do {
-                try process.run()
-                
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                
-                process.waitUntilExit()
-                
-                let output = String(data: data, encoding: .utf8) ?? ""
-                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                let success = process.terminationStatus == 0
-                
-                DispatchQueue.main.async {
-                    if success {
-                        self.loadInstalledPackages()
-                    }
-                    completion(success, output + errorOutput)
+            DispatchQueue.main.async {
+                // Add to simulated packages list
+                if !self.installedPackages.contains(packageName) {
+                    self.installedPackages.append(packageName)
                 }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(false, error.localizedDescription)
-                }
+                completion(true, simulatedOutput)
             }
         }
     }
     
     func loadInstalledPackages() {
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            guard let self = self else { return }
-            
-            let process = Process()
-            let pipe = Pipe()
-            
-            process.executableURL = URL(fileURLWithPath: self.pipPath)
-            process.arguments = ["list", "--format=freeze"]
-            process.standardOutput = pipe
-            
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                
-                if let output = String(data: data, encoding: .utf8) {
-                    let packages = output.components(separatedBy: "\n")
-                        .filter { !$0.isEmpty }
-                        .map { $0.components(separatedBy: "==").first ?? $0 }
-                    
-                    DispatchQueue.main.async {
-                        self.installedPackages = packages
-                    }
-                }
-            } catch {
-                print("Failed to load packages: \(error)")
-            }
+        DispatchQueue.main.async { [weak self] in
+            // Simulate some common packages
+            self?.installedPackages = [
+                "pip",
+                "setuptools",
+                "wheel"
+            ]
         }
     }
     
     func interruptExecution() {
-        process?.terminate()
         isRunning = false
         output += "\n--- Execution Interrupted ---\n"
     }
     
     func clearOutput() {
         output = ""
+    }
+}
+
+// MARK: - Python Interpreter Simulator
+// This simulates Python execution. For a real implementation:
+// 1. Bundle Python.framework with the app
+// 2. Use PythonKit or similar library
+// 3. Or use WebAssembly-based Python (Pyodide)
+private class PythonInterpreter {
+    func execute(_ code: String) -> String {
+        // Simple simulation of common Python commands
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Handle print statements
+        if trimmedCode.starts(with: "print(") {
+            let startIndex = trimmedCode.index(trimmedCode.startIndex, offsetBy: 6)
+            let endIndex = trimmedCode.index(before: trimmedCode.endIndex)
+            let content = String(trimmedCode[startIndex..<endIndex])
+            
+            // Remove quotes if present
+            let cleaned = content.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            return cleaned + "\n"
+        }
+        
+        // Handle simple math
+        if let result = evaluateSimpleMath(trimmedCode) {
+            return "\(result)\n"
+        }
+        
+        // Handle import statements
+        if trimmedCode.starts(with: "import ") || trimmedCode.starts(with: "from ") {
+            return "" // Silent success for imports
+        }
+        
+        // Handle for loops with print (very basic)
+        if trimmedCode.contains("for ") && trimmedCode.contains("print(") {
+            return simulateForLoop(trimmedCode)
+        }
+        
+        // Default response for unhandled code
+        return """
+        [Simulated Output]
+        Note: Full Python execution requires embedding Python framework.
+        
+        Your code:
+        \(trimmedCode)
+        
+        To enable real Python execution:
+        1. Integrate Python.framework or PythonKit
+        2. Bundle Python runtime with the app
+        3. Configure proper iOS entitlements
+        
+        """
+    }
+    
+    private func evaluateSimpleMath(_ expression: String) -> Double? {
+        let mathExpression = NSExpression(format: expression)
+        return mathExpression.expressionValue(with: nil, context: nil) as? Double
+    }
+    
+    private func simulateForLoop(_ code: String) -> String {
+        // Very basic simulation of "for i in range(n): print(i)"
+        if code.contains("range(") {
+            if let rangeStart = code.range(of: "range("),
+               let rangeEnd = code.range(of: ")", range: rangeStart.upperBound..<code.endIndex),
+               let count = Int(code[rangeStart.upperBound..<rangeEnd.lowerBound]) {
+                var output = ""
+                for i in 0..<count {
+                    output += "\(i)\n"
+                }
+                return output
+            }
+        }
+        return "[Loop output would appear here with real Python interpreter]\n"
     }
 }

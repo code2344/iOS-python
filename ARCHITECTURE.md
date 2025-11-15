@@ -435,7 +435,7 @@ DispatchQueue.global(qos: .userInitiated).async {
 ## Deployment
 
 ### Build Configuration
-- **Target**: iPadOS 18.0+
+- **Target**: iPadOS 17.0+
 - **Device**: iPad only
 - **Architecture**: ARM64 (Apple Silicon)
 

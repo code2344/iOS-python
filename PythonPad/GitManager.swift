@@ -30,46 +30,46 @@ class GitManager: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let process = Process()
-            let pipe = Pipe()
-            let errorPipe = Pipe()
-            
             // Extract repo name from URL
             let repoName = url.components(separatedBy: "/").last?.replacingOccurrences(of: ".git", with: "") ?? "repo"
             let targetPath = (self.documentsPath as NSString).appendingPathComponent(repoName)
             
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["clone", url, targetPath]
-            process.standardOutput = pipe
-            process.standardError = errorPipe
+            // Simulate Git clone since Process API is not available on iOS
+            let simulatedOutput = """
+            Note: Git operations require Process API which is not available on iOS/iPadOS.
             
+            To enable Git functionality:
+            1. Use URLSession to download repository as ZIP
+            2. Integrate libgit2 via Objective-Git or SwiftGit2
+            3. Or use GitHub/GitLab API for repository access
+            
+            Repository '\(repoName)' would be cloned to:
+            \(targetPath)
+            
+            For demonstration, creating a sample repository folder...
+            """
+            
+            // Create a demo folder structure
             do {
-                try process.run()
+                try FileManager.default.createDirectory(atPath: targetPath, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(atPath: (targetPath as NSString).appendingPathComponent(".git"), withIntermediateDirectories: true)
                 
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                
-                process.waitUntilExit()
-                
-                let output = String(data: data, encoding: .utf8) ?? ""
-                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                let success = process.terminationStatus == 0
+                // Create a sample README
+                let readmePath = (targetPath as NSString).appendingPathComponent("README.md")
+                let readmeContent = "# \(repoName)\n\nThis is a simulated repository.\nTo enable real Git cloning, integrate libgit2 or use GitHub API."
+                try readmeContent.write(toFile: readmePath, atomically: true, encoding: .utf8)
                 
                 DispatchQueue.main.async {
                     self.isOperating = false
-                    if success {
-                        self.operationStatus = "Repository cloned successfully"
-                        self.loadRepositories()
-                    } else {
-                        self.operationStatus = "Failed to clone repository"
-                    }
-                    completion(success, output + errorOutput)
+                    self.operationStatus = "Repository simulated successfully"
+                    self.loadRepositories()
+                    completion(true, simulatedOutput + "\n\nSample folder created successfully!")
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.isOperating = false
-                    self.operationStatus = "Error: \(error.localizedDescription)"
-                    completion(false, error.localizedDescription)
+                    self.operationStatus = "Failed to create repository folder"
+                    completion(false, "Error: \(error.localizedDescription)")
                 }
             }
         }
@@ -87,40 +87,24 @@ class GitManager: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let process = Process()
-            let pipe = Pipe()
-            let errorPipe = Pipe()
+            // Simulate Git pull
+            let simulatedOutput = """
+            Note: Git pull requires Process API or libgit2 integration.
             
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["pull"]
-            process.currentDirectoryURL = URL(fileURLWithPath: repository.path)
-            process.standardOutput = pipe
-            process.standardError = errorPipe
+            For repository: \(repository.name)
+            Path: \(repository.path)
             
-            do {
-                try process.run()
-                
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                
-                process.waitUntilExit()
-                
-                let output = String(data: data, encoding: .utf8) ?? ""
-                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                
-                DispatchQueue.main.async {
-                    self.isOperating = false
-                    if process.terminationStatus == 0 {
-                        self.operationStatus = "Pull successful: \(output)"
-                    } else {
-                        self.operationStatus = "Pull failed: \(errorOutput)"
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.isOperating = false
-                    self.operationStatus = "Error: \(error.localizedDescription)"
-                }
+            To enable Git pull:
+            1. Integrate SwiftGit2 or Objective-Git (libgit2 wrapper)
+            2. Use GitHub/GitLab REST API
+            3. Download and extract repository as ZIP
+            
+            Simulated: Already up to date.
+            """
+            
+            DispatchQueue.main.async {
+                self.isOperating = false
+                self.operationStatus = "Pull simulated (see console for details)"
             }
         }
     }
